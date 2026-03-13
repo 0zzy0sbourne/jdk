@@ -50,7 +50,7 @@ public class MissedURShiftIAddILShiftIdeal {
         framework.start();
     }
 
-    @Run(test = {"testI", "testICommuted", "testIComputedY",
+    @Run(test = {"testI", "testICommuted", "testIComputedY", "testIComputedX",
                   "testL", "testLCommuted", "testLComputedY", "testLComputedX"})
     public void runMethod() {
         int xi = RANDOM.nextInt();
@@ -71,6 +71,7 @@ public class MissedURShiftIAddILShiftIdeal {
         Asserts.assertEQ(((x << 3) + y) >>> 3, testI(x, y));
         Asserts.assertEQ((y + (x << 5)) >>> 5, testICommuted(x, y));
         Asserts.assertEQ(((x << 7) + (a ^ b)) >>> 7, testIComputedY(x, a, b));
+        Asserts.assertEQ((((a ^ b) << 19) + y) >>> 19, testIComputedX(a, b, y));
     }
 
     @DontCompile
@@ -135,6 +136,23 @@ public class MissedURShiftIAddILShiftIdeal {
                   IRNode.AND_L,     "1"})
     static long testLComputedY(long x, long a, long b) {
         return ((x << 13) + (a ^ b)) >>> 13;
+    }
+
+    @Test
+    // (((a ^ b) << v) + y) >>> 19  =>  ((a ^ b) + (y >>> 19)) & mask
+    // v is only known to be 19 after loop optimization, so LShiftI's shift count
+    // changes mid-IGVN. URShiftI must be notified through AddI (Case 2).
+    @IR(counts = {IRNode.LSHIFT_I,  "0",
+                  IRNode.URSHIFT_I, "1",
+                  IRNode.AND_I,     "1"})
+    static int testIComputedX(int a, int b, int y) {
+        int u = 19;
+        int v = 0;
+        do {
+            u--;
+            v++;
+        } while (u > 0);
+        return (((a ^ b) << v) + y) >>> 19;
     }
 
     @Test
