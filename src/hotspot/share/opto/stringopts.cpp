@@ -730,14 +730,18 @@ PhaseStringOpts::PhaseStringOpts(PhaseGVN* gvn):
 
     // Skip string concat optimization if the estimated node expansion
     // would exceed the node budget. Each argument can generate up to
-    // estimated_nodes_per_concat_arg
-    uint estimated_nodes = (uint)sc->num_arguments() * estimated_nodes_per_concat_arg;
+    // estimated_nodes_per_concat_arg nodes; the extra "+ 1" reserves one
+    // argument's worth of headroom for the fixed per-concat overhead (the
+    // StringBuilder allocation elision, array setup and toString replacement)
+    // that is not attributable to any single argument. Without it a concat
+    // with zero arguments would get a budget of 0 yet still create nodes.
+    uint estimated_nodes = ((uint)sc->num_arguments() + 1) * estimated_nodes_per_concat_arg;
     if (C->live_nodes() + estimated_nodes > C->max_node_limit() - NodeLimitFudgeFactor) {
       continue;
     }
 
     // Assert to verify that a replacement did not create
-    // more than n * 330 nodes.
+    // more than the estimated number of nodes.
 #ifdef ASSERT
     uint nodes_before = C->live_nodes();
 #endif
